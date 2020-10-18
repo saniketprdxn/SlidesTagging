@@ -11,7 +11,7 @@ try {
 } catch(PDOException $e) {
         //echo"Connection failed: " . $e->getMessage();
 }
-$path_to_folder = "LIVE/ppt_files";
+$path_to_folder = "LIVE/ppt_files/";
 $file = fopen("Tagging UHC to Oxford.xlsx - ME.csv", "r");
 
 // getUpdateData($conn, $file, $path_to_folder);
@@ -164,18 +164,19 @@ function getInsertData($conn, $file, $path_to_folder)
                         $parent_data = $parent_check_run->fetch(PDO::FETCH_ASSOC);
                         $parent_id = $parent_data['id'];
 
-                        $parent_pptx_check_query = "SELECT pptx_file_id FROM `slide_resources` WHERE `base_slide_id` = ?";
-                        $parent_pptx_check_run = $conn->prepare($parent_pptx_check_query);
-                        $parent_pptx_check_run->execute([$parent_id]);
-                        $parent_pptx_data = $parent_pptx_check_run->fetch(PDO::FETCH_ASSOC);
-
                         if($parent_data) {
                             $is_parent_oxford = platformCheck($conn, $parent_data, 2);                  
                             if($is_parent_oxford == "false") {
-                                if($parent_pptx_data)
-                                fileSystemCheck($conn, $parent_data, 1, $path_to_folder);
+
+                                $parent_pptx_check_query = "SELECT pptx_file_id FROM `slide_resources` WHERE `base_slide_id` = ?";
+                                $parent_pptx_check_run = $conn->prepare($parent_pptx_check_query);
+                                $parent_pptx_check_run->execute([$parent_id]);
+                                $parent_pptx_data = $parent_pptx_check_run->fetch(PDO::FETCH_ASSOC);
+
+                                if(isset($parent_pptx_data['pptx_file_id']))
+                                    fileSystemCheck($conn, $parent_data, 1, $path_to_folder);
                                 else
-                                tagOxford($conn, $parent_data, 2);
+                                    tagOxford($conn, $parent_data, 2);
                             }
                             $is_base_slide_oxford = platformCheck($conn, $base_slide_data, 2);
                             if($is_base_slide_oxford == "false") {
@@ -193,6 +194,7 @@ function getInsertData($conn, $file, $path_to_folder)
                     if($base_slide_data) {
                         $is_single_oxford = platformCheck($conn, $base_slide_data, 2);                        
                         if($is_single_oxford == "false") {
+                            // pre_r($base_slide_data);
                             fileSystemCheck($conn, $base_slide_data, 1, $path_to_folder);
                         }
                     }
@@ -213,10 +215,10 @@ function platformCheck($conn, $platform_slide_data, $platform_check)
     $platform_check_run->execute();
     $platform_check_data = $platform_check_run->fetch(PDO::FETCH_ASSOC);
 
-    if(!$platform_check_data)
-        return $is_oxford = 'false';
-    else 
+    if($platform_check_data)
         return $is_oxford = 'true';
+    else 
+        return $is_oxford = 'false';
 
 }
 
@@ -234,7 +236,6 @@ function tagOxford($conn, $tag_slide_data, $platform_tag)
 
 function fileSystemCheck($conn, $slide_data, $platform, $path_to_folder)
 {
-    $root_path = "/UHCtoOXF/";
     $slide_id = $slide_data['id'];
     $resource = [];
     $uhc_copy = $oxford_copy = '';
@@ -321,14 +322,14 @@ function fileSystemCheck($conn, $slide_data, $platform, $path_to_folder)
             // preview image file path
             $oxf_preview_path = substr(substr($oxford_copy,strrpos( $oxford_copy, '_files')),6);
             $oxf_preview_file = str_replace('.pptx', '.jpg', $oxf_preview_path);
-            $oxf_preview_file_path = $root_path."LIVE/previews".$oxf_preview_file;
+            $oxf_preview_file_path = "LIVE/previews".$oxf_preview_file;
             // pptx file path
             $oxf_preview_path_cmd = substr(substr($Oxford_ppt_path,strrpos( $Oxford_ppt_path, '_files')),6);
             $oxf_preview_file_cmd = str_replace('.pptx', '.jpg', $oxf_preview_path_cmd);
-            $oxf_preview_file_path_cmd = $root_path."LIVE/previews".$oxf_preview_file_cmd;
+            $oxf_preview_file_path_cmd = "LIVE/previews".$oxf_preview_file_cmd;
 
             // slidemaster file path
-            $slide_master_oxford = $root_path.'Pptx/slidemaster-o.pptx';
+            $slide_master_oxford = 'Pptx/slidemaster-o.pptx';
             $options = [$slide_master_oxford,$Oxford_ppt_path, $oxf_preview_file_path_cmd, $oxf_logo_file_path_cmd];
             exec("java -jar Pptx/convert.jar " . implode (' ', $options));
             echo $oxf_preview_file_path." preview generated Successfully\n\n";
@@ -383,7 +384,6 @@ function fileSystemCheck($conn, $slide_data, $platform, $path_to_folder)
         // extracted text data insertion in database
         $extracted_insert_query = "INSERT INTO extracted_texts (level1,level2, level3, slide_number, level4) VALUES (?,?,?,?,?)";
         $extracted_insert_run = $conn->prepare($extracted_insert_query);
-        $conn->beginTransaction();
         $extracted_insert_run->execute([($extracted_text['level1']) ? $extracted_text['level1'] : NULL,($extracted_text['level2']) ? $extracted_text['level2'] : NULL,($extracted_text['level3']) ? $extracted_text['level3'] : NULL,($extracted_text['slide_number']) ? $extracted_text['slide_number'] : NULL, ($extracted_text['level4']) ? $extracted_text['level4'] : NULL]);
         $ext_txt_last_inserted_id = $conn->lastInsertId();
         echo $ext_txt_last_inserted_id." extracted text inserted Successfully\n\n";
@@ -406,7 +406,7 @@ function fileSystemCheck($conn, $slide_data, $platform, $path_to_folder)
         if (file_exists($oxford_copy)) {
             $json_metadata_file = substr(substr($oxford_copy,strrpos( $oxford_copy, '/')),1);
             $oxf_json_metadata_file = str_replace('.pptx', '.json', $json_metadata_file);
-            $metadata_file_path =  $root_path."LIVE/ppt_files/".$oxf_json_metadata_file;
+            $metadata_file_path =  "LIVE/ppt_files/".$oxf_json_metadata_file;
             $slidesDefinition = [];
             $slidesDefinition = [
                 'id' => $slide_resources_last_insert_id.'[1]',
