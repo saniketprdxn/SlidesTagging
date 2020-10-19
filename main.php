@@ -54,22 +54,6 @@ foreach ($data as $head) {
                 //resource data insertion
                 $resource_id = insert_slide_resources($conn, $slide_id, $value['platform'], $pptx_id, $preview_image_id, $extracted_text_id);
 
-                //resource id update
-                // if(!update_table($conn, $pptx_id, $resource_id, 'pptx_files', 'resource_id')){
-                //     $conn->rollBack();
-                //     continue;
-                // }
-
-                // if(!update_table($conn, $preview_image_id, $resource_id, 'previews_images', 'resource_id')){
-                //     $conn->rollBack();
-                //     continue;
-                // }
-
-                // if(!update_table($conn, $extracted_text_id, $resource_id, 'extracted_texts', 'resource_id')){
-                //     $conn->rollBack();
-                //     continue;
-                // }
-
                 $conn->commit();
             }
         }

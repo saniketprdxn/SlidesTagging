@@ -329,18 +329,3 @@ function insert_extracted_texts($conn, $row)
     $sub_head_id = $conn->lastInsertId();
     return $sub_head_id;
 }
-
-// function update_table($conn, $id, $resource_id, $tablename, $column){
-
-//     $query = "UPDATE $tablename 
-//                 SET $column =  $resource_id
-//               WHERE id = $id";
-//     $result = $conn->prepare($query);
-//     $result->execute();
-//     $count_row = $result->rowCount();
-//     if($count_row > 0){
-//         return true;
-//     }
-
-//     return false;
-// }
