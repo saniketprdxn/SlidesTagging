@@ -12,7 +12,7 @@ try {
         //echo"Connection failed: " . $e->getMessage();
 }
 $path_to_folder = "LIVE/ppt_files/";
-$file = fopen("Tagging UHC to Oxford.xlsx - ME.csv", "r");
+$file = fopen("Tagging UHC to Oxford.xlsx - Batch 1Final.csv", "r");
 
 // getUpdateData($conn, $file, $path_to_folder);
 getInsertData($conn, $file, $path_to_folder);
@@ -34,7 +34,7 @@ function getInsertData($conn, $file, $path_to_folder)
             $line[1] != NULL && 
             $line[1] != "Head" && 
             $line[1] != "Header") {
-            
+            pre_r($line);
             if ($line[4] == 'DD') {
                 if ((strpos($line[3], 'Detail Deck') == false) || (strpos($line[3], 'Deck') == false)) {
                     $parent_lvl = $line[3]."/DD";
@@ -51,14 +51,6 @@ function getInsertData($conn, $file, $path_to_folder)
                     }
                     $woZero = implode('.', $ids);
                 }
-
-                if (!empty($line[2])) {
-                    $pptx_files = $line[1]."/".$line[2]."/".str_replace('/', ' ', $line[3])."/".$woZero." ".$line[7].".pptx";
-                    $file_exist = $line[1]."/".$line[2]."/".$line[3];
-                } else {
-                    $pptx_files = $line[1]."/".str_replace('/', ' ', $line[3])."/".$woZero." ".$line[7].".pptx";
-                    $file_exist = $line[1]."/".$line[3];
-                }
                 
                 if($line[8]) {
                     $platform = '2';
@@ -67,11 +59,9 @@ function getInsertData($conn, $file, $path_to_folder)
                 $insertArray[$line[1]][$line[2]][$parent_lvl][] = array(
                     'name' => trim($line[7]),
                     'tracking' => $woZero,
-                    'pptx' => $pptx_files,
-                    'preview' => str_replace('.pptx', '.jpg', trim($pptx_files)),
-                    'file_exist' => $file_exist,
                     'platform' => $platform,
                 );
+
             } elseif ($line[4] == 'Single') {
                 if (!empty($line[6])) {
                     $dot = strtok($line[6], '.');
@@ -85,24 +75,13 @@ function getInsertData($conn, $file, $path_to_folder)
                     $woZero = implode('.', $ids);
                 }
 
-                if (!empty($line[2])) {
-                    $pptx_files = $line[1]."/".$line[2]."/".$woZero." ".$line[7].".pptx";;
-                    $file_exist = $line[1]."/".$line[2];
-                } else {
-                    $pptx_files = $line[1]."/".$woZero." ".$line[7].".pptx";;
-                    $file_exist = $line[1];
-                }
-
                 if($line[8]) {
                     $platform = '2';
                 }
 
                 $insertArray[$line[1]][$line[2]][$line[3]] = array(
-                    'name' => trim($line[7]),
+                    'name' =>  trim($line[7]),
                     'tracking' => $woZero,
-                    'pptx' => $pptx_files,
-                    'preview' => str_replace('.pptx', '.jpg', $pptx_files),
-                    'file_exist' => $file_exist,
                     'platform' => $platform,
                 );
             }
@@ -125,7 +104,7 @@ function getInsertData($conn, $file, $path_to_folder)
 
         if($head_data) {
             $is_head_oxford = platformCheck($conn, $head_data, 2);
-            if($is_head_oxford == "false") {
+            if($is_head_oxford === "false") {
                 tagOxford($conn, $head_data, 2);
             }
         }
@@ -137,11 +116,10 @@ function getInsertData($conn, $file, $path_to_folder)
             $sub_head_check_run->execute([$sub_head, $head_id]);
             $sub_head_data = $sub_head_check_run->fetch(PDO::FETCH_ASSOC);
             $sub_head_id = $sub_head_data['id'];
-
             if($sub_head_data) {
                 $is_sub_head_oxford = platformCheck($conn, $sub_head_data, 2);
-                if($is_sub_head_oxford == "false") {
-                    tagOxford($conn, $head_data, 2);
+                if($is_sub_head_oxford === "false") {
+                    tagOxford($conn, $sub_head_data, 2);
                 }
             }
 
@@ -149,43 +127,42 @@ function getInsertData($conn, $file, $path_to_folder)
 
                 $DD_status = ((strpos($key, 'Detail Deck')) || (strpos($key, 'Deck')) || (strpos($key, 'DD'))) ? 1 : 0;
                 $parent_tracking_id = ((strpos($key, 'Detail Deck')) || (strpos($key, 'Deck')) || (strpos($key, 'DD'))) ? NULL : $value['tracking'];
-
                 if(isset($value[0])) {
-                    $base_slide_check_query = "SELECT * FROM `base_slides` WHERE `name` LIKE ?";
-                    $base_slide_check_run = $conn->prepare($base_slide_check_query);
-                    $base_slide_check_run->execute([$value[0]['name']]);
-                    $base_slide_data = $base_slide_check_run->fetch(PDO::FETCH_ASSOC);
-                    $base_slide_id = $base_slide_data['id'];
+                    foreach ($value as $key => $child) {
+                        $base_slide_check_query = "SELECT * FROM `base_slides` WHERE `name` LIKE ?";
+                        $base_slide_check_run = $conn->prepare($base_slide_check_query);
+                        $base_slide_check_run->execute(["%".$child['name']."%"]);
+                        $base_slide_data = $base_slide_check_run->fetch(PDO::FETCH_ASSOC);
+                        $base_slide_id = $base_slide_data['id'];
 
-                    if($base_slide_data) {
-                        $parent_check_query = "SELECT * FROM `base_slides` WHERE `id` = ?";
-                        $parent_check_run = $conn->prepare($parent_check_query);
-                        $parent_check_run->execute([$base_slide_data['parent_id']]);
-                        $parent_data = $parent_check_run->fetch(PDO::FETCH_ASSOC);
-                        $parent_id = $parent_data['id'];
-
-                        if($parent_data) {
-                            $is_parent_oxford = platformCheck($conn, $parent_data, 2);                  
-                            if($is_parent_oxford == "false") {
-
-                                $parent_pptx_check_query = "SELECT pptx_file_id FROM `slide_resources` WHERE `base_slide_id` = ?";
-                                $parent_pptx_check_run = $conn->prepare($parent_pptx_check_query);
-                                $parent_pptx_check_run->execute([$parent_id]);
-                                $parent_pptx_data = $parent_pptx_check_run->fetch(PDO::FETCH_ASSOC);
-
-                                if(isset($parent_pptx_data['pptx_file_id']))
-                                    fileSystemCheck($conn, $parent_data, 1, $path_to_folder);
-                                else
-                                    tagOxford($conn, $parent_data, 2);
-                            }
-                            $is_base_slide_oxford = platformCheck($conn, $base_slide_data, 2);
-                            if($is_base_slide_oxford == "false") {
-                                fileSystemCheck($conn, $base_slide_data, 1, $path_to_folder);
+                        if($base_slide_data) {
+                            $parent_check_query = "SELECT * FROM `base_slides` WHERE `id` = ?";
+                            $parent_check_run = $conn->prepare($parent_check_query);
+                            $parent_check_run->execute([$base_slide_data['parent_id']]);
+                            $parent_data = $parent_check_run->fetch(PDO::FETCH_ASSOC);
+                            $parent_id = $parent_data['id'];
+                            if($parent_data) {
+                                $is_parent_oxford = platformCheck($conn, $parent_data, 2);
+                                if($is_parent_oxford === "false") {
+                                    $parent_pptx_check_query = "SELECT pptx_file_id FROM `slide_resources` WHERE `base_slide_id` = ?";
+                                    $parent_pptx_check_run = $conn->prepare($parent_pptx_check_query);
+                                    $parent_pptx_check_run->execute([$parent_id]);
+                                    $parent_pptx_data = $parent_pptx_check_run->fetch(PDO::FETCH_ASSOC);
+    
+                                    if(isset($parent_pptx_data['pptx_file_id']))
+                                        fileSystemCheck($conn, $parent_data, 1, $path_to_folder);
+                                    else
+                                        tagOxford($conn, $parent_data, 2);
+                                }
+                                $is_base_slide_oxford = platformCheck($conn, $base_slide_data, 2);
+                                if($is_base_slide_oxford === "false") {
+                                    fileSystemCheck($conn, $base_slide_data, 1, $path_to_folder);
+                                }
                             }
                         }
                     }
-
                 } else {
+
                     $base_slide_check_query = "SELECT * FROM `base_slides` WHERE `name` LIKE ?";
                     $base_slide_check_run = $conn->prepare($base_slide_check_query);
                     $base_slide_check_run->execute([$value['name']]);
@@ -193,8 +170,7 @@ function getInsertData($conn, $file, $path_to_folder)
                     $base_slide_id = $base_slide_data['id'];
                     if($base_slide_data) {
                         $is_single_oxford = platformCheck($conn, $base_slide_data, 2);                        
-                        if($is_single_oxford == "false") {
-                            // pre_r($base_slide_data);
+                        if($is_single_oxford === "false") {
                             fileSystemCheck($conn, $base_slide_data, 1, $path_to_folder);
                         }
                     }
@@ -204,33 +180,45 @@ function getInsertData($conn, $file, $path_to_folder)
     }
 }
 
-function platformCheck($conn, $platform_slide_data, $platform_check)
+function platformCheck($conn, $platform_slide_data, $oxford_platform)
 {
     $platform_slide_id = $platform_slide_data['id'];
     $platform_check_query = "SELECT * FROM `slide_resources` 
                             WHERE `slide_resources`.`base_slide_id` = :base_slide_id
-                            AND `slide_resources`.`platform_id` = ".$platform_check;
+                            AND `slide_resources`.`platform_id` = ".$oxford_platform;
     $platform_check_run = $conn->prepare($platform_check_query);
     $platform_check_run->bindParam(':base_slide_id', $platform_slide_id);
     $platform_check_run->execute();
     $platform_check_data = $platform_check_run->fetch(PDO::FETCH_ASSOC);
 
-    if($platform_check_data)
-        return $is_oxford = 'true';
+    if(empty($platform_check_data))
+        return $is_oxford = "false";
     else 
-        return $is_oxford = 'false';
+        return $is_oxford = "true";
 
 }
 
-function tagOxford($conn, $tag_slide_data, $platform_tag) 
+function tagOxford($conn, $tag_slide_data, $Oxf_platform) 
 {
-    $slide_resources_tag_query = "INSERT INTO slide_resources (base_slide_id,platform_id,logo_position,logos) VALUES (:base_slide_id, :platform, :logo_position_data, :logos)"; 
-    $slide_resources_tag_run = $conn->prepare($slide_resources_tag_query);
-    $slide_resources_tag_run->bindParam(':base_slide_id', $tag_slide_data['id']);
-    $slide_resources_tag_run->bindParam(':platform', $platform_tag);
-    $slide_resources_tag_run->bindParam(':logo_position_data',  $tag_slide_data['logo_position']);
-    $slide_resources_tag_run->bindParam(':logos',  $tag_slide_data['logos']);
-    $slide_resources_tag_run->execute();
+
+    $already_oxford_check_query = "SELECT * FROM `slide_resources` 
+                            WHERE `slide_resources`.`base_slide_id` = :base_slide_id
+                            AND `slide_resources`.`platform_id` = ".$Oxf_platform;
+    $already_oxford_check_run = $conn->prepare($already_oxford_check_query);
+    $already_oxford_check_run->bindParam(':base_slide_id', $tag_slide_data['id']);
+    $already_oxford_check_run->execute();
+    $already_oxford_check_data = $already_oxford_check_run->fetch(PDO::FETCH_ASSOC);
+
+    if(empty($already_oxford_check_data)) {
+        $slide_resources_tag_query = "INSERT INTO slide_resources (base_slide_id,platform_id,logo_position,logos) VALUES (:base_slide_id, :platform, :logo_position_data, :logos)"; 
+        $slide_resources_tag_run = $conn->prepare($slide_resources_tag_query);
+        $slide_resources_tag_run->bindParam(':base_slide_id', $tag_slide_data['id']);
+        $slide_resources_tag_run->bindParam(':platform', $Oxf_platform);
+        $slide_resources_tag_run->bindParam(':logo_position_data',  $tag_slide_data['logo_position']);
+        $slide_resources_tag_run->bindParam(':logos',  $tag_slide_data['logos']);
+        $slide_resources_tag_run->execute();
+        // echo "slide resources inserted";
+    }
 }
 
 
@@ -249,6 +237,7 @@ function fileSystemCheck($conn, $slide_data, $platform, $path_to_folder)
     $slide_resources_data = $slide_resources_run->fetch(PDO::FETCH_ASSOC);
     
     if($slide_resources_data) {
+        $platform = 2;
         $pptx_check_query = "SELECT * FROM `pptx_files` WHERE `id` = ".$slide_resources_data['pptx_file_id'];
         $pptx_check_run = $conn->prepare($pptx_check_query);
         $pptx_check_run->execute();
@@ -340,9 +329,9 @@ function fileSystemCheck($conn, $slide_data, $platform, $path_to_folder)
             $logo_position = $logos_status = '';
             $logo_info = json_decode(file_get_contents($oxf_logo_file_path), true);
             echo " logo_info Json decoded Successfully\n\n";
-            if(!$logo_info['error_status']) {
-                $logo_position = $logo_info['alignment'];
-                $logos_status = $logo_info['status'];
+            if(!$logo_info['error_status'] === false || !$logo_info['error_status'] == "false") {
+                $logo_position = ($logo_info['alignment']) ? $logo_info['alignment'] : "top";
+                $logos_status = ($logo_info['status']) ? $logo_info['status'] : '0';
             }
         }
 
@@ -352,34 +341,53 @@ function fileSystemCheck($conn, $slide_data, $platform, $path_to_folder)
         $pptx_mime_type = trim(mime_content_type($oxford_copy));
         $pptx_extension = end(explode('.', $oxford_copy));
         $timestring = $now->format('Y-m-d h:i:s');
+        $path_to_remove = 'LIVE/ppt_files/';
+        $pptx_insert_file_path = str_ireplace($path_to_remove, '', $oxford_copy);
 
-        $pptx_insert_query = "INSERT INTO pptx_files (file_path, size, mime_type,extension,created_at,updated_at) VALUES (:pptx, :size, :mime_type, :extension, :created_at, :updated_at)";
-        $pptx_insert_run = $conn->prepare($pptx_insert_query);
-        $pptx_insert_run->bindParam(':pptx', $oxford_copy);
-        $pptx_insert_run->bindParam(':size', $pptx_size);
-        $pptx_insert_run->bindParam(':mime_type', $pptx_mime_type);
-        $pptx_insert_run->bindParam(':extension', $pptx_extension);
-        $pptx_insert_run->bindParam(':created_at', $timestring);
-        $pptx_insert_run->bindParam(':updated_at', $timestring);
-        $pptx_insert_run->execute();
-        $pptx_last_inserted_id = $conn->lastInsertId();
-        echo $pptx_last_inserted_id." pptx inserted Successfully\n\n";
+        $already_inserted_pptx_check_query = "SELECT * FROM `pptx_files` WHERE `file_path` = ?";
+        $already_inserted_pptx_check_run = $conn->prepare($already_inserted_pptx_check_query);
+        $already_inserted_pptx_check_run->execute([$pptx_insert_file_path]);
+        $already_inserted_pptx_data = $already_inserted_pptx_check_run->fetch(PDO::FETCH_ASSOC);
+
+        if (empty($already_inserted_pptx_data)) {
+            $pptx_insert_query = "INSERT INTO pptx_files (file_path, size, mime_type,extension,created_at,updated_at) VALUES (:pptx, :size, :mime_type, :extension, :created_at, :updated_at)";
+            $pptx_insert_run = $conn->prepare($pptx_insert_query);
+            $pptx_insert_run->bindParam(':pptx', $pptx_insert_file_path);
+            $pptx_insert_run->bindParam(':size', $pptx_size);
+            $pptx_insert_run->bindParam(':mime_type', $pptx_mime_type);
+            $pptx_insert_run->bindParam(':extension', $pptx_extension);
+            $pptx_insert_run->bindParam(':created_at', $timestring);
+            $pptx_insert_run->bindParam(':updated_at', $timestring);
+            $pptx_insert_run->execute();
+            $pptx_last_inserted_id = $conn->lastInsertId();
+            echo $pptx_last_inserted_id." pptx inserted Successfully\n\n";
+        }
 
         // preview image data insertion in database
+        $path_to_remove = 'LIVE/previews/';
+        $preview_insert_file_path = str_ireplace($path_to_remove, '', $oxf_preview_file_path);
         $preview_size = filesize($oxf_preview_file_path);
         $preview_mime_type = trim(mime_content_type($oxf_preview_file_path));
         $preview_extension = end(explode('.', $oxf_preview_file_path));
-        $preview_insert_query = "INSERT INTO previews_images (file_path,size,mime_type,extension,created_at,updated_at) VALUES (:preview, :size, :mime_type, :extension, :created_at, :updated_at)";
-        $preview_insert_run = $conn->prepare($preview_insert_query);
-        $preview_insert_run->bindParam(':preview', $oxf_preview_file_path);
-        $preview_insert_run->bindParam(':size', $preview_size);
-        $preview_insert_run->bindParam(':mime_type', $preview_mime_type);
-        $preview_insert_run->bindParam(':extension', $preview_extension);
-        $preview_insert_run->bindParam(':created_at', $timestring);
-        $preview_insert_run->bindParam(':updated_at', $timestring);
-        $preview_insert_run->execute();
-        $preview_last_inserted_id = $conn->lastInsertId();
-        echo $preview_last_inserted_id." preview inserted Successfully\n\n";
+
+        $already_inserted_preview_check_query = "SELECT * FROM `previews_images` WHERE `file_path` = ?";
+        $already_inserted_preview_check_run = $conn->prepare($already_inserted_preview_check_query);
+        $already_inserted_preview_check_run->execute([$preview_insert_file_path]);
+        $already_inserted_preview_data = $already_inserted_preview_check_run->fetch(PDO::FETCH_ASSOC);
+
+        if (empty($already_inserted_pptx_data)) {
+            $preview_insert_query = "INSERT INTO previews_images (file_path,size,mime_type,extension,created_at,updated_at) VALUES (:preview, :size, :mime_type, :extension, :created_at, :updated_at)";
+            $preview_insert_run = $conn->prepare($preview_insert_query);
+            $preview_insert_run->bindParam(':preview', $preview_insert_file_path);
+            $preview_insert_run->bindParam(':size', $preview_size);
+            $preview_insert_run->bindParam(':mime_type', $preview_mime_type);
+            $preview_insert_run->bindParam(':extension', $preview_extension);
+            $preview_insert_run->bindParam(':created_at', $timestring);
+            $preview_insert_run->bindParam(':updated_at', $timestring);
+            $preview_insert_run->execute();
+            $preview_last_inserted_id = $conn->lastInsertId();
+            echo $preview_last_inserted_id." preview inserted Successfully\n\n";                
+        }
 
         // extracted text data insertion in database
         $extracted_insert_query = "INSERT INTO extracted_texts (level1,level2, level3, slide_number, level4) VALUES (?,?,?,?,?)";
@@ -388,19 +396,28 @@ function fileSystemCheck($conn, $slide_data, $platform, $path_to_folder)
         $ext_txt_last_inserted_id = $conn->lastInsertId();
         echo $ext_txt_last_inserted_id." extracted text inserted Successfully\n\n";
 
-        // slide resources data insertion in database
-        $slide_resources_insert_query = "INSERT INTO slide_resources (base_slide_id,platform_id,pptx_file_id,preview_image_id,extracted_text_id,logo_position,logos) VALUES (:base_slide_id, :platform, :pptx_ids, :search_preview_data, :search_extracted_text_data, :logo_position_data, :logos)"; 
-        $slide_resources_insert_run = $conn->prepare($slide_resources_insert_query);
-        $slide_resources_insert_run->bindParam(':base_slide_id', $slide_data['id']);
-        $slide_resources_insert_run->bindParam(':platform', $platform);
-        $slide_resources_insert_run->bindParam(':pptx_ids', $pptx_last_inserted_id);
-        $slide_resources_insert_run->bindParam(':search_preview_data', $preview_last_inserted_id);
-        $slide_resources_insert_run->bindParam(':search_extracted_text_data', $ext_txt_last_inserted_id);
-        $slide_resources_insert_run->bindParam(':logo_position_data', $logo_position);
-        $slide_resources_insert_run->bindParam(':logos', $logos_status);
-        $slide_resources_insert_run->execute();
-        $slide_resources_last_insert_id = $conn->lastInsertId();
-        echo $slide_resources_last_insert_id." slide resource inserted Successfully\n\n";
+        $already_inserted_slide_resource_check_query = "SELECT * FROM `slide_resources`
+        WHERE `slide_resources`.`base_slide_id` = :base_slide_id AND `slide_resources`.`platform_id` = ".$platform;
+        $already_inserted_slide_resource_check_run = $conn->prepare($already_inserted_slide_resource_check_query);
+        $already_inserted_slide_resource_check_run->bindParam(':base_slide_id', $slide_data['id']);
+        $already_inserted_slide_resource_check_run->execute();
+        $already_inserted_slide_resource_data = $already_inserted_slide_resource_check_run->fetch(PDO::FETCH_ASSOC);
+
+        if (empty($already_inserted_pptx_data)) {
+            // slide resources data insertion in database
+            $slide_resources_insert_query = "INSERT INTO slide_resources (base_slide_id,platform_id,pptx_file_id,preview_image_id,extracted_text_id,logo_position,logos) VALUES (:base_slide_id, :platform, :pptx_ids, :search_preview_data, :search_extracted_text_data, :logo_position_data, :logos)"; 
+            $slide_resources_insert_run = $conn->prepare($slide_resources_insert_query);
+            $slide_resources_insert_run->bindParam(':base_slide_id', $slide_data['id']);
+            $slide_resources_insert_run->bindParam(':platform', $platform);
+            $slide_resources_insert_run->bindParam(':pptx_ids', $pptx_last_inserted_id);
+            $slide_resources_insert_run->bindParam(':search_preview_data', $preview_last_inserted_id);
+            $slide_resources_insert_run->bindParam(':search_extracted_text_data', $ext_txt_last_inserted_id);
+            $slide_resources_insert_run->bindParam(':logo_position_data', $logo_position);
+            $slide_resources_insert_run->bindParam(':logos', $logos_status);
+            $slide_resources_insert_run->execute();
+            $slide_resources_last_insert_id = $conn->lastInsertId();
+            echo $slide_resources_last_insert_id." slide resource inserted Successfully\n\n";            
+        }
 
         // create a json output of slide_resources [metadata building]
         if (file_exists($oxford_copy)) {
