@@ -34,7 +34,6 @@ function getInsertData($conn, $file, $path_to_folder)
             $line[1] != NULL && 
             $line[1] != "Head" && 
             $line[1] != "Header") {
-            pre_r($line);
             if ($line[4] == 'DD') {
                 if ((strpos($line[3], 'Detail Deck') == false) || (strpos($line[3], 'Deck') == false)) {
                     $parent_lvl = $line[3]."/DD";
@@ -262,19 +261,15 @@ function fileSystemCheck($conn, $slide_data, $platform, $path_to_folder)
         // passing that copy to text Extracter Jar
         if (file_exists($oxford_copy)) {
 
-            $Oxford_ppt_path = '';
+            $Oxford_ppt_path_cmd = '';
             $textExtracterResult = '';
             $extracted_text = [];
             $jsonPath = str_replace('.pptx', '_2.json', $oxford_copy);
 
-            // creating path for terminal
-            $arr = explode(' ',$oxford_copy);
-            foreach($arr as $key => $value) {
-                $Oxford_ppt_path.=$value."\\ ";
-            }
-            $Oxford_ppt_path = substr($Oxford_ppt_path,0,strlen($Oxford_ppt_path)-2);
-            $jsonPath_for_cmd = str_replace('.pptx', '_2.json', $Oxford_ppt_path);
-            $options = [$Oxford_ppt_path, $jsonPath_for_cmd];
+            $Oxford_ppt_path_cmd = '"'.$oxford_copy.'"';
+            $jsonPath_for_cmd = '"'.str_replace('.pptx', '_2.json', $oxford_copy).'"';
+            $jsonPath = str_replace('.pptx', '_2.json', $oxford_copy);
+            $options = [$Oxford_ppt_path_cmd, $jsonPath_for_cmd];
 
             // text extracter command
             exec("java -jar Pptx/text-extracter.jar " . implode (' ', $options));
@@ -298,32 +293,25 @@ function fileSystemCheck($conn, $slide_data, $platform, $path_to_folder)
 
         // passing that copy to convert jar to generate preview
         if (file_exists($oxford_copy)) {
-
             // logo info json path
             $json_logo_file = substr(substr($oxford_copy,strrpos( $oxford_copy, '/')),1);
             $oxf_json_logo_file = str_replace('.pptx', '.json', $json_logo_file); 
             $oxf_logo_file_path = $path_to_folder."show_logos/".$oxf_json_logo_file;
             // logo info json path for terminal
-            $json_logo_file_cmd = substr(substr($Oxford_ppt_path,strrpos( $Oxford_ppt_path, '/')),1);
-            $oxf_json_logo_file_cmd = str_replace('.pptx', '.json', $json_logo_file_cmd); 
-            $oxf_logo_file_path_cmd = $path_to_folder."show_logos/".$oxf_json_logo_file_cmd;
-
+            $json_logo_file_cmd = '"'.$oxf_logo_file_path.'"';
             // preview image file path
             $oxf_preview_path = substr(substr($oxford_copy,strrpos( $oxford_copy, '_files')),6);
             $oxf_preview_file = str_replace('.pptx', '.jpg', $oxf_preview_path);
             $oxf_preview_file_path = "LIVE/previews".$oxf_preview_file;
             // pptx file path
-            $oxf_preview_path_cmd = substr(substr($Oxford_ppt_path,strrpos( $Oxford_ppt_path, '_files')),6);
-            $oxf_preview_file_cmd = str_replace('.pptx', '.jpg', $oxf_preview_path_cmd);
-            $oxf_preview_file_path_cmd = "LIVE/previews".$oxf_preview_file_cmd;
+            $oxf_preview_file_path_cmd = '"'.$oxf_preview_file_path.'"';
 
             // slidemaster file path
-            $slide_master_oxford = 'Pptx/slidemaster-o.pptx';
-            $options = [$slide_master_oxford,$Oxford_ppt_path, $oxf_preview_file_path_cmd, $oxf_logo_file_path_cmd];
+            $slide_master_oxford = '"Pptx/slidemaster-o.pptx"';
+            $options = [$slide_master_oxford,$Oxford_ppt_path_cmd, $oxf_preview_file_path_cmd, $json_logo_file_cmd];
             exec("java -jar Pptx/convert.jar " . implode (' ', $options));
             echo $oxf_preview_file_path." preview generated Successfully\n\n";
         }
-
         // Logo info data
         if(file_exists($oxf_logo_file_path)) {
             $logo_position = $logos_status = '';
