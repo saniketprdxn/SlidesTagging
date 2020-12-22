@@ -347,13 +347,13 @@ function tagBaseSlide($conn, $tag_slide_data, $platform_to_be_tagged)
     $already_tagged_check_data = $already_tagged_check_run->fetch(PDO::FETCH_ASSOC);
     if(empty($already_tagged_check_data)) {
         echo "tagged base slide ".$tag_slide_data['id']."\n\n";
-    //     $slide_resources_tag_query = "INSERT INTO slide_resources (base_slide_id,platform_id,logo_position,logos) VALUES (:base_slide_id, :platform, :logo_position_data, :logos)"; 
-    //     $slide_resources_tag_run = $conn->prepare($slide_resources_tag_query);
-    //     $slide_resources_tag_run->bindParam(':base_slide_id', $tag_slide_data['id']);
-    //     $slide_resources_tag_run->bindParam(':platform', $Oxf_platform);
-    //     $slide_resources_tag_run->bindParam(':logo_position_data',  $tag_slide_data['logo_position']);
-    //     $slide_resources_tag_run->bindParam(':logos',  $tag_slide_data['logos']);
-    //     $slide_resources_tag_run->execute();
+        $slide_resources_tag_query = "INSERT INTO slide_resources (base_slide_id,platform_id,logo_position,logos) VALUES (:base_slide_id, :platform, :logo_position_data, :logos)"; 
+        $slide_resources_tag_run = $conn->prepare($slide_resources_tag_query);
+        $slide_resources_tag_run->bindParam(':base_slide_id', $tag_slide_data['id']);
+        $slide_resources_tag_run->bindParam(':platform', $Oxf_platform);
+        $slide_resources_tag_run->bindParam(':logo_position_data',  $tag_slide_data['logo_position']);
+        $slide_resources_tag_run->bindParam(':logos',  $tag_slide_data['logos']);
+        $slide_resources_tag_run->execute();
     } else {
         echo "already tagged ".$tag_slide_data['id']."\n\n";
     }

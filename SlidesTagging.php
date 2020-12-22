@@ -13,11 +13,24 @@ $path_to_folder = "LIVE/ppt_files/";
 $file = fopen("Tagging UHC to Oxford.xlsx - Batch run 23_10_20.csv", "r");
 $platform_to_tag = 2;
 $default_platform = 1;
+$keyArray = array();
 
 // getUpdateData($conn, $file, $path_to_folder);
 $insertArray = getInsertData($conn, $file, $path_to_folder);
-DatabaseCheck($insertArray,$default_platform,$platform_to_tag,$conn,$path_to_folder);
+$sortedplatform = DatabaseCheck($insertArray,$default_platform,$platform_to_tag,$conn,$path_to_folder);
 
+function sortAssociativeArray($givenArray) {
+    global $keyArray;
+   foreach ($givenArray as $key => $value) {
+    if(!is_array($value)){
+      $keyArray[$key] = $value; 
+    } else {
+    sortAssociativeArray($value);
+    }
+   }
+   return $keyArray;
+}
+// pre_r($sortedplatform);
 
 function DatabaseCheck($insertArray,$default_platform,$platform_to_tag,$conn,$path_to_folder)
 {
@@ -25,22 +38,29 @@ function DatabaseCheck($insertArray,$default_platform,$platform_to_tag,$conn,$pa
         $head = $head_key;
         $head_data = getBaseSlideFromName($head,$conn);
         $head_id = $head_data['id'];
-
+        $platforms = [];
         if($head_data) {
             $is_head_already_tagged = platformCheck($conn, $head_data, $platform_to_tag);
             if($is_head_already_tagged === "false" || $is_head_already_tagged === false) {
-                tagBaseSlide($conn, $head_data, $platform_to_tag);
+                $sortedData = sortAssociativeArray($data);
+                $platforms = array_slice($sortedData,2);
+                // return $platforms;
+                foreach ($platforms as $key => $platform_to_tag) {
+                // tagBaseSlide($conn, $head_data, $platform_to_tag);
+                }
             }
         }
 
         foreach ($data as $keys => $subhead) {
             $sub_head = ($keys) ? $keys : "";
-            $sub_head_data = getBaseSlideFromNameAndParentId($sub_head,$head_id,$conn);
+            $sub_head_data = getBaseSlideFromNameAndParentId($sub_head,$head_id,$conn); 
             $sub_head_id = $sub_head_data['id'];
             if($sub_head_data) {
                 $is_sub_head_already_tagged = platformCheck($conn, $sub_head_data, $platform_to_tag);
                 if($is_sub_head_already_tagged === "false" || $is_sub_head_already_tagged === false) {
-                    tagBaseSlide($conn, $sub_head_data, $platform_to_tag);
+                    foreach ($platforms as $key => $platform_to_tag) {
+                    // tagBaseSlide($conn, $sub_head_data, $platform_to_tag);
+                    }
                 }
             }
 
@@ -62,14 +82,21 @@ function DatabaseCheck($insertArray,$default_platform,$platform_to_tag,$conn,$pa
                                 if($is_parent_already_tagged === "false" || $is_parent_already_tagged === false) {
                                     $parent_pptx_data = getPptxId($parent_id,$conn);
     
-                                    if(isset($parent_pptx_data['pptx_file_id']))
-                                        defaultCheck($conn, $parent_data, $default_platform, $platform_to_tag, $path_to_folder);
-                                    else
-                                        tagBaseSlide($conn, $parent_data, $platform_to_tag);
+                                    if(isset($parent_pptx_data['pptx_file_id'])) {
+                                        foreach ($platforms as $key => $platform_to_tag) {
+                                        // defaultCheck($conn, $parent_data, $default_platform, $platform_to_tag, $path_to_folder);                                        
+                                        }
+                                    } else {
+                                        foreach ($platforms as $key => $platform_to_tag) {
+                                        // tagBaseSlide($conn, $parent_data, $platform_to_tag);                                        
+                                        }
+                                    }
                                 }
                                 $is_base_slide_already_tagged = platformCheck($conn, $base_slide_data, $platform_to_tag);
                                 if($is_base_slide_already_tagged === "false" || $is_base_slide_already_tagged === false) {
-                                    defaultCheck($conn, $base_slide_data, $default_platform, $platform_to_tag, $path_to_folder);
+                                    foreach ($platforms as $key => $platform_to_tag) {
+                                    // defaultCheck($conn, $base_slide_data, $default_platform, $platform_to_tag, $path_to_folder);                                    
+                                    }
                                 }
                             }
                         }
@@ -80,7 +107,9 @@ function DatabaseCheck($insertArray,$default_platform,$platform_to_tag,$conn,$pa
                     if($base_slide_data) {
                         $is_single_already_tagged = platformCheck($conn, $base_slide_data, $platform_to_tag);                        
                         if($is_single_already_tagged === "false" || $is_single_already_tagged === false) {
-                            defaultCheck($conn, $base_slide_data, $default_platform, $platform_to_tag, $path_to_folder);
+                            foreach ($platforms as $key => $platform_to_tag) {
+                            // defaultCheck($conn, $base_slide_data, $default_platform, $platform_to_tag, $path_to_folder);                            
+                            }
                         }
                     }
                 }
@@ -317,7 +346,7 @@ function insertSlideResources($conn,$platform_copy,$platform_to_tag,$insert_data
         $slide_resources_insert_run = $conn->prepare($slide_resources_insert_query);
         $slide_resources_insert_run->bindParam(':base_slide_id', $insert_data['base_slide']);
         $slide_resources_insert_run->bindParam(':platform',  $platform_to_tag);
-        $slide_resources_insert_run->bindParam(':pptx_flie', $insert_data['pptx_file']);
+        $slide_resources_insert_run->bindParam(':pptx_file', $insert_data['pptx_file']);
         $slide_resources_insert_run->bindParam(':preview_image', $insert_data['preview_image']);
         $slide_resources_insert_run->bindParam(':extracted_text', $insert_data['extracted_text']);
         $slide_resources_insert_run->bindParam(':logo_position', $logo_position);
@@ -329,6 +358,7 @@ function insertSlideResources($conn,$platform_copy,$platform_to_tag,$insert_data
         return NULL;
     }
 }
+
 
 function generateMetaData($platform_copy,$slide_resources_last_insert_id, $updated_at)
 {
